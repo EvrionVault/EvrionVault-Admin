@@ -30,9 +30,14 @@ function ResetPassword() {
     <section className="flex min-h-[80vh] items-center justify-center">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
-          <img src="/evrionvault-logo.png" alt="EvrionVault" className="h-10 w-10 rounded-xl" />
+          <img
+            src="/evrionvault-logo.png"
+            alt="EvrionVault"
+            className="h-12 w-12 rounded-xl object-contain bg-white border border-slate-100 p-1"
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+          />
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-brand-600">EvrionVault</p>
+            <p className="text-base font-extrabold tracking-wide" style={{ color: '#3c6ef2' }}>EvrionVault</p>
             <p className="text-sm font-semibold text-slate-900">Security</p>
           </div>
         </div>
@@ -69,7 +74,8 @@ function ResetPassword() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-brand-700 disabled:opacity-50"
+            className="mt-2 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-all disabled:opacity-50"
+            style={{ backgroundColor: loading ? '#7c9ef7' : '#3c6ef2' }}
           >
             {loading ? 'Updating...' : 'Update Password'}
           </button>

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 export const api = axios.create({
-  baseURL: 'https://evrionvault-backend.onrender.com',
+  baseURL: import.meta.env.VITE_API_URL || 'https://evrionvault-backend.onrender.com',
   headers: {
     'Content-Type': 'application/json',
   },
