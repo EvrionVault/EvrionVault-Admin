@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api.js'
 import ImageUpload from '../components/ImageUpload.jsx'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
+import LuxuryPhonePreview from '../components/LuxuryPhonePreview.jsx'
+import EntranceGroupModal from '../components/EntranceGroupModal.jsx'
 
 const COLOR_PALETTES = [
   { hex: '#3c6ef2', name: 'Blue' },
@@ -47,13 +49,18 @@ function CreateEventAdmin() {
   const [loading, setLoading] = useState(false)
   const [createdEvent, setCreatedEvent] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [activeGroupModal, setActiveGroupModal] = useState(null)
 
   const [form, setForm] = useState({
     title: '',
     type: 'wedding',
     template: 'modern',
-    entranceStyle: 'none',
+    entranceStyle: 'envelope',
     colorPalette: '#3c6ef2',
+    accentColor: '#3c6ef2',
+    monogram: '',
+    musicTrack: 'piano',
+    waxSealColor: 'gold',
     location: '',
     dressCode: '',
     description: '',
@@ -134,6 +141,46 @@ function CreateEventAdmin() {
 
   const [errorMsg, setErrorMsg] = useState('')
 
+  const searchParams = new URLSearchParams(window.location.search)
+  const editId = searchParams.get('edit')
+
+  useEffect(() => {
+    if (!editId) return
+    setLoading(true)
+    api.get(`/events/by-id/${editId}`)
+      .then((res) => {
+        const ev = res.data?.event || res.data
+        if (ev) {
+          setForm({
+            title: ev.title || '',
+            type: ev.type || 'wedding',
+            template: ev.template || 'modern',
+            entranceStyle: ev.entranceStyle || 'scratch-card',
+            colorPalette: ev.colorPalette || '#6366f1',
+            monogram: ev.monogram || '',
+            musicTrack: ev.musicTrack || 'piano',
+            waxSealColor: ev.waxSealColor || 'gold',
+            location: ev.location || '',
+            dressCode: ev.dressCode || '',
+            description: ev.description || '',
+            links: ev.links?.length > 0 ? ev.links : [{ title: '', url: '' }],
+            documents: ev.documents || [],
+            date: ev.date ? new Date(ev.date).toISOString().split('T')[0] : '',
+            endDate: ev.endDate ? new Date(ev.endDate).toISOString().split('T')[0] : '',
+            isMultiDay: Boolean(ev.isMultiDay),
+            invitationMessage: ev.invitationMessage || '',
+            accessLevel: ev.accessLevel || 'private',
+            coverImage: ev.coverImage || '',
+            stages: ev.stages || [],
+          })
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching event for edit:', err)
+      })
+      .finally(() => setLoading(false))
+  }, [editId])
+
   const handleSubmit = async () => {
     setLoading(true)
     setErrorMsg('')
@@ -155,13 +202,16 @@ function CreateEventAdmin() {
         })),
       }
 
-      const response = await api.post('/events', payload)
+      const response = editId
+        ? await api.put(`/events/${editId}`, payload)
+        : await api.post('/events', payload)
+
       const eventData = response.data?.event || response.data
       setCreatedEvent(eventData)
       setStep(4) // Show share screen
     } catch (err) {
-      console.error('Error creating event:', err)
-      const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || 'Failed to create event. Please check your inputs.'
+      console.error('Error saving event:', err)
+      const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || 'Failed to save event. Please check your inputs.'
       setErrorMsg(typeof msg === 'string' ? msg : JSON.stringify(msg))
     } finally {
       setLoading(false)
@@ -604,118 +654,230 @@ function CreateEventAdmin() {
         </div>
       )}
 
-      {/* Step 3: Choose Template */}
+      {/* Step 3: Choose Template & Intros */}
       {step === 3 && (
         <div className="space-y-6">
-          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 sm:p-8 space-y-5 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900">Select a Template</h2>
-            <p className="text-sm text-slate-500">Pick a visual style for the event page.</p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Left Controls Panel */}
+            <div className="lg:col-span-7 space-y-6">
+              
+              {/* Template Selection */}
+              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 sm:p-8 space-y-5 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-900">1. Select a Layout Theme</h2>
+                <p className="text-sm text-slate-500">Pick a visual luxury style for the event page.</p>
 
-            <div className="grid gap-5 sm:grid-cols-3">
-              {['modern', 'classic', 'elegant'].map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setForm({ ...form, template: t })}
-                  className={`relative overflow-hidden rounded-2xl border-2 p-4 text-left transition ${
-                    form.template === t ? 'border-brand-500 bg-brand-50/50 shadow-sm' : 'border-slate-200 bg-white hover:border-brand-300'
-                  }`}
-                >
-                  <h3 className="font-bold capitalize text-slate-900 mb-2">{t}</h3>
-                  {/* Preview */}
-                  <div className={`mt-3 aspect-[4/3] rounded-lg border flex flex-col overflow-hidden ${
-                    t === 'elegant' ? 'bg-slate-900 border-slate-700' : t === 'classic' ? 'bg-[#fdfbf7] border-slate-300' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <div className="h-2/5 w-full bg-slate-300 relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                      <div className="absolute bottom-1 left-2 text-[6px] font-bold text-white uppercase">{t === 'classic' ? form.type || 'Event' : form.type || 'EVENT'}</div>
-                    </div>
-                    <div className={`p-2.5 flex-1 ${t === 'classic' ? 'font-serif text-center' : 'font-sans'}`}>
-                      <div className={`h-2.5 rounded mb-1.5 ${t === 'elegant' ? 'bg-slate-600 w-3/4' : 'bg-slate-800 w-3/4'} ${t === 'classic' ? 'mx-auto' : ''}`} />
-                      <div className={`h-1.5 rounded mb-3 ${t === 'elegant' ? 'bg-slate-700 w-1/2' : 'bg-slate-400 w-1/2'} ${t === 'classic' ? 'mx-auto' : ''}`} />
-                      <div className="space-y-1">
-                        <div className={`h-6 rounded-md border ${t === 'elegant' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} />
-                        <div className={`h-6 rounded-md border ${t === 'elegant' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} />
-                      </div>
-                    </div>
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+                  {[
+                    { id: 'custom-photo', label: '📸 Custom Image Studio', desc: 'Upload photo + pick any animation' },
+                    { id: 'classic', label: '👑 Royal Ivory & Gold', desc: 'Serif elegance, gold foil' },
+                    { id: 'flight-pass', label: '✈️ Destination Flight', desc: 'Jetsetter runway invitation' },
+                    { id: 'elegant', label: '🌙 Midnight Velvet', desc: 'Deep dark gold foil' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, template: t.id })}
+                      className={`relative rounded-2xl border-2 p-4 text-left transition ${
+                        form.template === t.id ? 'border-brand-500 bg-brand-50/50 shadow-sm' : 'border-slate-200 bg-white hover:border-brand-300'
+                      }`}
+                    >
+                      <h3 className="font-bold text-xs text-slate-900">{t.label}</h3>
+                      <p className="text-[10px] text-slate-500 mt-1">{t.desc}</p>
+                      {form.template === t.id && (
+                        <div className="absolute top-2 right-2 h-4 w-4 rounded-full bg-brand-500 flex items-center justify-center text-white text-[10px]">✓</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Entrance Style Selection */}
+              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 sm:p-8 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">2. Entrance Animation & Accent Color</h2>
+                    <p className="text-sm text-slate-500">Tap a group below to choose sub-styles, animation, and single accent color tint.</p>
                   </div>
-                  {form.template === t && (
-                    <div className="absolute top-4 right-4 h-5 w-5 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs">✓</div>
-                  )}
-                </button>
-              ))}
+                </div>
+
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+                  {[
+                    { key: 'curtains', label: 'Curtains 🎭', icon: '🎭', desc: 'Center Open, Swag, Fan, Ripple' },
+                    { key: 'hearts', label: 'Hearts ❤️', icon: '❤️', desc: 'Beat, Burst, Floating, Swirl' },
+                    { key: 'envelope', label: 'Envelopes ✉️', icon: '✉️', desc: 'Open, Fly-In, Letter Reveal' },
+                    { key: 'castles', label: 'Castles 🏰', icon: '🏰', desc: 'Gate Open, Drawbridge, Build' },
+                    { key: 'scratch', label: 'Scratch Cards 🎟️', icon: '🎟️', desc: 'Mystery, Prize, Photo, Match' },
+                    { key: 'bow', label: 'Bow Knots 🎀', icon: '🎀', desc: 'Untie, Pull Ribbon, Gift Bow' },
+                    { key: 'balloons', label: 'Balloons 🎈', icon: '🎈', desc: 'Float, Pop, Release' },
+                    { key: 'confetti', label: 'Confetti 🎊', icon: '🎊', desc: 'Burst, Fall, Cannon' },
+                    { key: 'fireworks', label: 'Fireworks 🎆', icon: '🎆', desc: 'Single, Double, Finale' },
+                    { key: 'stars', label: 'Stars ⭐', icon: '⭐', desc: 'Twinkle, Burst, Shooting' },
+                    { key: 'sparkles', label: 'Sparkles ✨', icon: '✨', desc: 'Glow, Shimmer, Sweep' },
+                    { key: 'flowers', label: 'Flowers 🌸', icon: '🌸', desc: 'Bloom, Petal Fall, Scatter' },
+                    { key: 'gifts', label: 'Gifts 🎁', icon: '🎁', desc: 'Open, Unwrap, Pop' },
+                    { key: 'cakes', label: 'Cakes 🎂', icon: '🎂', desc: 'Cut, Candle Blow, Reveal' },
+                    { key: 'graduation', label: 'Graduation 🎓', icon: '🎓', desc: 'Cap Toss, Diploma Reveal' },
+                    { key: 'celebration', label: 'Celebration 🥂', icon: '🥂', desc: 'Cheers, Glass Clink, Toast' },
+                    { key: 'custom-photo', label: 'Custom Photo 📸', icon: '📸', desc: 'Personal Photo Unveil' },
+                  ].map((group) => {
+                    const isGroupActive =
+                      (group.key === 'custom-photo' && form.entranceStyle === 'custom-photo') ||
+                      (group.key === 'curtains' && form.entranceStyle?.startsWith('curtains')) ||
+                      (group.key === 'hearts' && form.entranceStyle?.startsWith('heart')) ||
+                      (group.key === 'envelope' && form.entranceStyle?.startsWith('envelope')) ||
+                      (group.key === 'castles' && (form.entranceStyle?.startsWith('castle') || form.entranceStyle?.startsWith('chandelier') || form.entranceStyle?.startsWith('arch'))) ||
+                      (group.key === 'scratch' && form.entranceStyle?.startsWith('scratch')) ||
+                      (group.key === 'bow' && form.entranceStyle?.startsWith('bow')) ||
+                      (group.key === 'balloons' && form.entranceStyle?.startsWith('balloon')) ||
+                      (group.key === 'confetti' && form.entranceStyle?.startsWith('confetti')) ||
+                      (group.key === 'fireworks' && form.entranceStyle?.startsWith('fireworks')) ||
+                      (group.key === 'stars' && form.entranceStyle?.startsWith('stars')) ||
+                      (group.key === 'sparkles' && form.entranceStyle?.startsWith('sparkles')) ||
+                      (group.key === 'flowers' && form.entranceStyle?.startsWith('flowers')) ||
+                      (group.key === 'gifts' && form.entranceStyle?.startsWith('gift')) ||
+                      (group.key === 'cakes' && form.entranceStyle?.startsWith('cake')) ||
+                      (group.key === 'graduation' && form.entranceStyle?.startsWith('grad')) ||
+                      (group.key === 'celebration' && (form.entranceStyle?.startsWith('cheers') || form.entranceStyle?.startsWith('celebration')))
+
+                    const accentColor = form.colorPalette || '#3c6ef2'
+
+                    return (
+                      <button
+                        key={group.key}
+                        type="button"
+                        onClick={() => {
+                          const defaultStyleMap = {
+                            'custom-photo': 'custom-photo',
+                            curtains: 'curtains',
+                            hearts: 'heart-beat',
+                            envelope: 'envelope-open',
+                            castles: 'castle-gate',
+                            scratch: 'scratch-mystery',
+                            bow: 'bow-untie',
+                            balloons: 'balloon-float',
+                            confetti: 'confetti-burst',
+                            fireworks: 'fireworks-single',
+                            stars: 'stars-twinkle',
+                            sparkles: 'sparkles-glow',
+                            flowers: 'flowers-bloom',
+                            gifts: 'gift-open',
+                            cakes: 'cake-cut',
+                            graduation: 'grad-captoss',
+                            celebration: 'cheers-toast',
+                          }
+                          const defaultStyle = defaultStyleMap[group.key] || 'curtains'
+                          setForm((prev) => ({ ...prev, entranceStyle: defaultStyle }))
+                          setActiveGroupModal(group.key)
+                        }}
+                        className={`relative flex flex-col items-center justify-center rounded-2xl border-2 p-5 text-center transition group ${
+                          isGroupActive
+                            ? 'shadow-md border-transparent'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                        }`}
+                        style={
+                          isGroupActive
+                            ? {
+                                borderColor: accentColor,
+                                backgroundColor: `${accentColor}12`,
+                                boxShadow: `0 4px 14px ${accentColor}25`,
+                              }
+                            : {}
+                        }
+                      >
+                        <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">{group.icon}</span>
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">{group.label}</span>
+                        <p className="text-[11px] text-slate-500 mt-1.5 leading-tight">{group.desc}</p>
+                        {isGroupActive && (
+                          <div
+                            className="absolute top-2 right-2 h-5 w-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-sm"
+                            style={{ backgroundColor: accentColor }}
+                          >
+                            ✓
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Section 2 Intro Animation Background Color Tint Selector */}
+                <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🎨</span> Intro Animation Color Tint
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Pick the background tint & visual atmosphere for your selected entrance animation.</p>
+                  </div>
+                  <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shrink-0">
+                    <input
+                      type="color"
+                      value={form.colorPalette || '#3c6ef2'}
+                      onChange={(e) => setForm({ ...form, colorPalette: e.target.value })}
+                      className="h-7 w-9 cursor-pointer rounded-md border-0 bg-transparent p-0"
+                    />
+                    <input
+                      type="text"
+                      value={form.colorPalette || '#3c6ef2'}
+                      onChange={(e) => setForm({ ...form, colorPalette: e.target.value })}
+                      className="w-20 text-xs font-mono font-semibold text-slate-700 bg-transparent outline-none uppercase"
+                      placeholder="#3C6EF2"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3 Buttons, Seals, Wax Accent Tint & Music Selection */}
+              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 sm:p-8 space-y-4 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-900">3. Buttons, Seals, Wax & Audio</h2>
+                <p className="text-sm text-slate-500">Customize the accent color for action buttons, monogram emblems, wax seals, and background music.</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="text-xs font-semibold text-slate-700 space-y-1 block">
+                    Buttons, Seals & Wax Accent Tint
+                    <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 mt-1">
+                      <input
+                        type="color"
+                        value={form.accentColor || '#3c6ef2'}
+                        onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
+                        className="h-7 w-9 cursor-pointer rounded-md border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={form.accentColor || '#3c6ef2'}
+                        onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
+                        className="w-24 text-xs font-mono font-semibold text-slate-700 bg-transparent outline-none uppercase"
+                        placeholder="#3C6EF2"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-700 space-y-1 block">
+                    Background Music Track
+                    <select
+                      value={form.musicTrack}
+                      onChange={(e) => setForm({ ...form, musicTrack: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-900 outline-none mt-1"
+                    >
+                      <option value="piano">🎹 Royal Piano Prelude</option>
+                      <option value="acoustic">🎸 Romantic Acoustic Guitar</option>
+                      <option value="strings">🎻 Garden String Quartet</option>
+                      <option value="">🚫 None</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
             </div>
+
+            {/* Right Live Phone Preview */}
+            <div className="lg:col-span-5 flex flex-col items-center">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Live Interactive Device Preview</h3>
+              <LuxuryPhonePreview form={form} />
+            </div>
+
           </div>
 
-          {/* Color Palette */}
-          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 sm:p-8 space-y-5 shadow-sm">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Choose an Accent Color</h2>
-              <p className="text-sm text-slate-500 mt-1">This color will tint buttons, headings, and highlights throughout the event page.</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {COLOR_PALETTES.map((c) => (
-                <button
-                  key={c.hex}
-                  type="button"
-                  onClick={() => setForm({ ...form, colorPalette: c.hex })}
-                  title={c.name}
-                  className="relative h-11 w-11 rounded-2xl border-4 transition hover:scale-110 focus:outline-none"
-                  style={{
-                    backgroundColor: c.hex,
-                    borderColor: form.colorPalette === c.hex ? c.hex : 'transparent',
-                    boxShadow: form.colorPalette === c.hex ? `0 0 0 3px white, 0 0 0 5px ${c.hex}` : 'none',
-                  }}
-                >
-                  {form.colorPalette === c.hex && (
-                    <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">✓</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <label className="text-sm font-medium text-slate-700">Custom Color</label>
-              <input
-                type="color"
-                value={form.colorPalette}
-                onChange={(e) => setForm({ ...form, colorPalette: e.target.value })}
-                className="h-9 w-16 cursor-pointer rounded-xl border border-slate-200 bg-white p-0.5"
-              />
-              <span className="text-sm font-mono text-slate-500">{form.colorPalette}</span>
-            </div>
-          </div>
-
-          {/* Entrance Animation */}
-          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 sm:p-8 space-y-5 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900">Choose an Entrance Animation</h2>
-            <p className="text-sm text-slate-500">Give guests a dramatic unveiling before they view the event.</p>
-
-            <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-              {[
-                { id: 'none', label: 'Direct Open', icon: '⚡' },
-                { id: 'envelope', label: 'Envelope', icon: '✉️' },
-                { id: 'curtains', label: 'Curtains', icon: '🎭' },
-                { id: 'fade', label: 'Fade In', icon: '✨' },
-              ].map((style) => (
-                <button
-                  key={style.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, entranceStyle: style.id })}
-                  className={`relative flex flex-col items-center justify-center rounded-2xl border-2 p-4 text-center transition ${
-                    form.entranceStyle === style.id ? 'border-brand-500 bg-brand-50/50 shadow-sm' : 'border-slate-200 bg-white hover:border-brand-300'
-                  }`}
-                >
-                  <span className="text-3xl mb-2">{style.icon}</span>
-                  <span className="font-bold text-slate-900 text-sm">{style.label}</span>
-                  {form.entranceStyle === style.id && (
-                    <div className="absolute top-2 right-2 h-4 w-4 rounded-full bg-brand-500 flex items-center justify-center text-white text-[10px]">✓</div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-200">
             {errorMsg && (
               <p className="text-sm font-semibold text-red-500 max-w-sm">{errorMsg}</p>
             )}
@@ -733,7 +895,7 @@ function CreateEventAdmin() {
                 disabled={loading}
                 className="rounded-full bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {loading ? 'Creating Event...' : 'Create Event'}
+                {loading ? 'Creating Event...' : 'Create & Publish Event ✨'}
               </button>
             </div>
           </div>
@@ -833,6 +995,15 @@ function CreateEventAdmin() {
           </div>
         </div>
       )}
+
+      {/* Entrance Animation Customizer Modal */}
+      <EntranceGroupModal
+        isOpen={Boolean(activeGroupModal)}
+        groupKey={activeGroupModal || 'curtains'}
+        form={form}
+        onChange={(updates) => setForm((prev) => ({ ...prev, ...updates }))}
+        onClose={() => setActiveGroupModal(null)}
+      />
     </section>
   )
 }

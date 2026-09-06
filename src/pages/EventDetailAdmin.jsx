@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../api.js'
+import LuxuryPhonePreview from '../components/LuxuryPhonePreview.jsx'
 
 const BLUE = '#3c6ef2'
 const MAIN_APP_URL = import.meta.env.VITE_APP_URL || 'https://evrionvault.vercel.app'
@@ -25,6 +26,7 @@ export default function EventDetailAdmin() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('overview') // overview | gallery | messages
   const [toast, setToast] = useState(null)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -118,7 +120,20 @@ export default function EventDetailAdmin() {
             <span className="text-xs text-slate-400">{formatDate(event.date)}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <Link
+            to={`/create-event?edit=${event._id}`}
+            className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition flex items-center gap-1.5"
+          >
+            <span>✏️</span> Edit Event Design
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowPreviewModal(true)}
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition flex items-center gap-1.5"
+          >
+            <span>✉️</span> Preview 3D Intro
+          </button>
           {guestUrl && (
             <a href={guestUrl} target="_blank" rel="noopener noreferrer"
               className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition">
@@ -131,6 +146,22 @@ export default function EventDetailAdmin() {
           </button>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+          <div className="relative bg-white rounded-3xl p-6 shadow-2xl max-w-lg w-full flex flex-col items-center">
+            <button
+              onClick={() => setShowPreviewModal(false)}
+              className="absolute top-4 right-4 text-xs font-bold bg-slate-100 rounded-full h-8 w-8 flex items-center justify-center text-slate-600 hover:bg-slate-200"
+            >
+              ✕
+            </button>
+            <h3 className="text-sm font-bold text-slate-900 mb-4">Interactive 3D Invitation Preview</h3>
+            <LuxuryPhonePreview form={event} />
+          </div>
+        </div>
+      )}
 
       {/* Cover image */}
       {coverImage && (
